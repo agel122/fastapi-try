@@ -91,6 +91,10 @@ async def create_record(record: RecordIn_Pydantic, user: User_Pydantic = Depends
     return await Record_Pydantic.from_tortoise_orm(obj)
 
 
+@app.get('/records/my', response_model=list[Record_Pydantic])
+async def get_records(user: User_Pydantic = Depends(get_current_user)):
+    return await Record_Pydantic.from_queryset(Record.filter(author__id=user.id))
+
 register_tortoise(
     app,
     db_url='sqlite://db.sqlite3',
