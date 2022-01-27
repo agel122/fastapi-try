@@ -22,8 +22,17 @@ class User(Model):
         return bcrypt.verify(password, self.password_hash)
 
 
+class Record(Model):
+    id = fields.IntField(pk=True)
+    record = fields.CharField(max_length=500)
+    author: fields.ForeignKeyRelation[User] = fields.ForeignKeyField('models.User', related_name='authors')
+
+
 User_Pydantic = pydantic_model_creator(User, name='User')
 UserIn_Pydantic = pydantic_model_creator(User, name='UserIn', exclude_readonly=True)
+
+Record_Pydantic = pydantic_model_creator(Record, name='Record')
+RecordIn_Pydantic = pydantic_model_creator(Record, name='RecordIn', exclude_readonly=True, exclude=('author_id',))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 
@@ -72,6 +81,14 @@ async def create_user(user: UserIn_Pydantic):
 @app.get('/users/me', response_model=User_Pydantic)
 async def get_user(user: User_Pydantic = Depends(get_current_user)):
     return user
+
+
+@app.post('/records', response_model=Record_Pydantic)
+async def create_record(record: RecordIn_Pydantic, user: User_Pydantic = Depends(get_current_user)):
+    record_data = record.dict()
+    record_data.update({"author_id": user.id})
+    obj = await Record.create(**record_data)
+    return await Record_Pydantic.from_tortoise_orm(obj)
 
 
 register_tortoise(
