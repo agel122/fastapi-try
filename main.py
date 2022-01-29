@@ -95,6 +95,45 @@ async def create_record(record: RecordIn_Pydantic, user: User_Pydantic = Depends
 async def get_records(user: User_Pydantic = Depends(get_current_user)):
     return await Record_Pydantic.from_queryset(Record.filter(author__id=user.id))
 
+
+@app.get('/records/my/{record_id}', response_model=Record_Pydantic)
+async def get_record(record_id: int, user: User_Pydantic = Depends(get_current_user)):
+    record = await Record.get(id=record_id)
+    if user.id != record.author_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="it's not your data"
+        )
+    return await Record_Pydantic.from_queryset_single(Record.get(id=record_id))
+
+
+@app.delete('/records/my/{record_id}')
+async def get_record(record_id: int, user: User_Pydantic = Depends(get_current_user)):
+    record = await Record.get(id=record_id)
+    if user.id != record.author_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="it's not your data, you can't delete it"
+        )
+    await record.delete()
+    return {'deleted message': record_id}
+
+
+@app.put('/records/my/{record_id}', response_model=Record_Pydantic)
+async def update_record(record_id: int, new_record: RecordIn_Pydantic,
+                        user: User_Pydantic = Depends(get_current_user)):
+    record = await Record.get(id=record_id)
+    if user.id != record.author_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="it's not your data, you can't update it"
+        )
+    new_record_data = new_record.dict()
+    new_record_data.update({"author_id": user.id})
+    await Record.filter(id=record_id).update(**new_record_data)
+    return await Record_Pydantic.from_queryset_single(Record.get(id=record_id))
+
+
 register_tortoise(
     app,
     db_url='sqlite://db.sqlite3',
@@ -102,4 +141,3 @@ register_tortoise(
     generate_schemas=True,
     add_exception_handlers=True
 )
-
